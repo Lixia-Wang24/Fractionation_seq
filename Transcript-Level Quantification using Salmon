@@ -1,0 +1,70 @@
+#!/bin/bash
+
+Build Salmon index: transcripts.fa
+
+Index="/Users/lixia/Data/database/ref_RNA/Ensembl/salmon_Ensembl_index"
+Out_dir="/Users/lixia/Data/data/Fractionation_seq/Salmon/Ensembl"
+Threads=8
+mkdir -p "${Out_dir}"
+
+sample="K562.LabE.polyA.cyt.rep1 K562.LabE.polyA.cyt.rep2 K562.LabE.polyA.nuc.rep1 K562.LabE.polyA.nuc.rep2"
+
+for s in ${sample}
+do
+
+step: Generate quant.sf file, script runs for about 7 minutes.
+
+salmon quant 
+
+    -i "${Index}" \
+    -l A \
+    -1 "${s}.1.trimmed.fastq.gz" 
+
+    -2 "${s}.2.trimmed.fastq.gz" \
+    -o "${Out_dir}/${s}" 
+
+    -p "$Threads" 
+
+    --rangeFactorizationBins 4 
+
+    --validateMappings 
+
+    --gcBias 
+
+    --seqBias
+
+The transcript_id in the resulting quant.sf file has a version number; however, the Ensembl GTF file lacks a version number, leading to issues mapping transcript_id to gene_id.
+
+GENCODE and NCBI annotations both have version numbers, so no processing is needed here.
+
+Remove transcript_id version number
+
+  awk -F'\t' 'BEGIN {OFS="\t"} {
+  # Keep the header row unchanged
+  if (NR==1) {print}
+else {
+split($1, id, ".");  # Split transcript_id by dot
+      $1 = id[1];           # Take the first part of the split result
+      print
+    }
+  }' "${Out_dir}/${s}/quant.sf" > "${Out_dir}/${s}/quant.tmp" 
+
+  && mv "${Out_dir}/${s}/quant.tmp" "${Out_dir}/${s}/quant.sf"
+
+done
+
+:<<!
+
+View mapping rate
+
+grep -A 5 "Mapping rate" ./Salmon/Ensembl/K562.LabE.polyA.cyt.rep1/logs/salmon_quant.log
+
+Result is as follows:
+
+[2024-07-17 15:30:45.345] Mapping rate = 85.2%
+
+Differential expression analysis
+
+Please check the R script(s) named "GeneExpressionDiff_analysis_Salmon_DESeq2" in the "Other-R-code" repository.
+
+!
